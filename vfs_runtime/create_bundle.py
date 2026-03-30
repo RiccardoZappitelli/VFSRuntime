@@ -1,6 +1,7 @@
 import os
 import struct
 import zlib
+from collections.abc import Callable
 
 MAGIC = b"RCPT"
 
@@ -18,7 +19,7 @@ def gather_files(root_dir: str):
             files.append((rel_path, full_path))
     return files
 
-def make_bundle(root_dir: str, output_file: str):
+def make_bundle(root_dir: str, output_file: str, encryption_function: Callable|None=None):
     files = gather_files(root_dir)
 
     blob_data = bytearray()
@@ -48,6 +49,12 @@ def make_bundle(root_dir: str, output_file: str):
         bundle.extend(struct.pack("<II", off, size))  # offset + size
 
     with open(output_file, "wb") as f:
+        if encryption_function:
+            try:
+                bundle = encryption_function(bundle)
+            except Exception as e:
+                print(f"[make_bundle] error while encrypting bundle:\n{e}")
+                return
         f.write(bundle)
 
     print(f"Bundle created: {output_file} ({len(bundle)} bytes, {len(files)} files)")
