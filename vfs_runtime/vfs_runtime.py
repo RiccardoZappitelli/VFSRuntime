@@ -9,6 +9,7 @@ import struct
 import zlib
 import tempfile
 import atexit
+from collections.abc import Callable
 
 
 # =========================
@@ -59,23 +60,16 @@ def vfs_log(func_name, params, action):
 def resolve_bundle_path():
     candidates = []
 
-    # 1. Explicit override
     if BUNDLE_PATH:
         candidates.append(BUNDLE_PATH)
-
-    # 2. CWD (most important in dev)
     candidates.append(os.path.abspath("assets.bin"))
-
-    # 3. Main script location (NOT module location)
     if hasattr(sys, "argv") and sys.argv[0]:
         main_path = os.path.abspath(sys.argv[0])
         candidates.append(os.path.join(os.path.dirname(main_path), "assets.bin"))
 
-    # 4. Executable dir (Nuitka standalone)
     exe_dir = os.path.dirname(sys.executable)
     candidates.append(os.path.join(exe_dir, "assets.bin"))
 
-    # 5. Appended to executable (Nuitka onefile)
     candidates.append(sys.executable)
 
     # DEBUG
@@ -104,10 +98,11 @@ def resolve_bundle_path():
 class VFS:
     MAGIC = b"RCPT"
 
-    def __init__(self):
+    def __init__(self, decryption_function: Callable|None=None):
         self.index = {}
         self.fp = None
         self._load_bundle()
+        self.decryption_function = decryption_function
 
     def _load_bundle(self):
         path = resolve_bundle_path()
@@ -118,6 +113,13 @@ class VFS:
         vfs_log("_load_bundle", f"path={path}", "loading bundle")
         with open(path, "rb") as f:
             data = f.read()
+
+        if self.decryption_function:
+            try:
+                data = self.decryption_function(data)
+            except Exception as e:
+                vfs_log("_load_bundle", f"path={path}", f"error while decryptiing bundle\n{e}")
+                return
 
         pos = data.rfind(self.MAGIC)
         if pos == -1:
