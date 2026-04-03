@@ -3,7 +3,7 @@ import struct
 import zlib
 from collections.abc import Callable
 
-MAGIC = b"RCPT"
+MAGIC = b"RCPTB"
 
 def compress_file(path: str) -> bytes:
     with open(path, "rb") as f:
