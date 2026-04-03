@@ -1,4 +1,4 @@
-import sys
+imporsts sys
 import os
 import builtins
 import importlib.abc
@@ -258,7 +258,10 @@ def vfs_open(path, *args, **kwargs):
     return _real_open(path, *args, **kwargs)
 
 def vfs_exists(path):
-    result = vfs.exists(path) or _real_exists(path)
+    if vfs and vfs.exists(path):
+        result = vfs.exists(path)
+    else:
+        result = _real_exists(path)
     vfs_log("exists_patch", f"{path} -> {result}")
     return result
 
