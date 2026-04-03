@@ -9,7 +9,8 @@ import zlib
 import tempfile
 import atexit
 from collections.abc import Callable
-from .conf import *
+
+from . import conf
 
 try:
     import cv2
@@ -17,20 +18,15 @@ try:
 except ImportError:
     cv2_installed = False
 
-
 FROZEN = getattr(sys, "frozen", False)
+
+vfs = None
 
 # =========================
 # LOGGING
 # =========================
 def vfs_log(func, msg):
     print(f"[VFS][{func}] {msg}")
-
-# =========================
-# DECRYPTION
-# =========================
-_decyption_function = lambda x: x
-
 
 # =========================
 # TEMP FILE HANDLER
@@ -68,18 +64,19 @@ def _norm(path: str) -> str:
 # =========================
 def resolve_bundle_path():
     candidates = []
+    name = conf.BUNDLE_NAME or "assets.bin"
 
-    if BUNDLE_PATH:
-        candidates.append(BUNDLE_PATH)
+    if conf.BUNDLE_PATH:
+        candidates.append(conf.BUNDLE_PATH)
 
-    candidates.append(os.path.abspath(BUNDLE_NAME))
+    candidates.append(os.path.abspath(name))
 
     if hasattr(sys, "argv") and sys.argv[0]:
         main_path = os.path.abspath(sys.argv[0])
-        candidates.append(os.path.join(os.path.dirname(main_path), BUNDLE_NAME))
+        candidates.append(os.path.join(os.path.dirname(main_path), name))
 
     exe_dir = os.path.dirname(sys.executable)
-    candidates.append(os.path.join(exe_dir, BUNDLE_NAME))
+    candidates.append(os.path.join(exe_dir, name))
 
     candidates.append(sys.executable)
 
@@ -99,15 +96,24 @@ def resolve_bundle_path():
             continue
 
         try:
-            with open(path, "rb") as f:
-                f.seek(0, 2)
-                size = f.tell()
-                seek_offset = max(size - 4096, 0)
-                f.seek(seek_offset, 0)
+            if conf.decryption_function:
+                with open(path, "rb") as f:
+                    try:
+                        data = f.read()
+                        #APPLY DECRYPTION IF AVAILABLE
+                        data = conf.decryption_function(data)
+                        vfs_log("resolve_bundle_path", f"decrypted {path}")
+                    except Exception as e:
+                        vfs_log("resolve_bundle_path", f"decrypt failed {path}: {e}")
+                        continue  # skip this candidate
+            else:
+                with open(path, "rb") as f:
+                    f.seek(0, 2)
+                    size = f.tell()
+                    f.seek(max(size - 4096, 0), 0)
+                    data = f.read()
 
-                tail = f.read()
-
-            if BUNDLE_MAGIC_BYTES in tail:
+            if conf.BUNDLE_MAGIC_BYTES in data:
                 vfs_log("resolve_bundle_path", f"FOUND bundle in {path}")
                 return path
             else:
@@ -123,7 +129,7 @@ def resolve_bundle_path():
 # VFS CORE
 # =========================
 class VFS:
-    MAGIC = BUNDLE_MAGIC_BYTES
+    MAGIC = conf.BUNDLE_MAGIC_BYTES
 
     def __init__(self, decryption_function: Callable | None = None):
         self.index = {}
@@ -229,7 +235,10 @@ class VFS:
         vfs_log("listdir", f"{path} -> {len(out)} entries")
         return list(out)
 
-vfs = VFS()
+def init_vfs():
+    global vfs
+    vfs_log("init_vfs", "initializing with current conf")
+    vfs = VFS(decryption_function=conf.decryption_function)
 
 # =========================
 # PATCH
@@ -242,7 +251,7 @@ if cv2_installed:
 
 def vfs_open(path, *args, **kwargs):
     norm = _norm(path)
-    if isinstance(norm, str) and vfs.exists(norm):
+    if (vfs and isinstance(norm, str)) and vfs.exists(norm):
         vfs_log("open", f"{norm} (VFS)")
         return vfs.open_file(norm)
     vfs_log("open", f"{path} (real)")
@@ -254,7 +263,7 @@ def vfs_exists(path):
     return result
 
 def vfs_listdir(path):
-    if vfs.exists(path):
+    if vfs and vfs.exists(path):
         vfs_log("listdir_patch", f"{path} (VFS)")
         return vfs.listdir(path)
     vfs_log("listdir_patch", f"{path} (real)")
@@ -263,7 +272,7 @@ def vfs_listdir(path):
 def vfs_imread(path, *args, **kwargs):
     if not cv2_installed:
         return
-    if vfs.exists(path):
+    if vfs and vfs.exists(path):
         tmp = extract_temp(path)
         vfs_log("imread", f"{path} -> {tmp}")
         return _real_imread(tmp, *args, **kwargs)
@@ -290,12 +299,12 @@ class VFSFinder(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         rel = fullname.replace(".", "/") + ".py"
 
-        if vfs.exists(rel):
+        if vfs and vfs.exists(rel):
             vfs_log("import", f"module {fullname}")
             return importlib.util.spec_from_loader(fullname, VFSLoader(), origin=rel)
 
         rel_init = fullname.replace(".", "/") + "/__init__.py"
-        if vfs.exists(rel_init):
+        if vfs and vfs.exists(rel_init):
             vfs_log("import", f"package {fullname}")
             return importlib.util.spec_from_loader(fullname, VFSLoader(), origin=rel_init, is_package=True)
 

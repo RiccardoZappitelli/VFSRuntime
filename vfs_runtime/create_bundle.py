@@ -1,9 +1,9 @@
 import os
 import struct
 import zlib
-from collections.abc import Callable
 
-from.conf import *
+from . import conf
+
 
 def compress_file(path: str) -> bytes:
     with open(path, "rb") as f:
@@ -19,7 +19,7 @@ def gather_files(root_dir: str):
             files.append((rel_path, full_path))
     return files
 
-def make_bundle(root_dir: str, output_file: str, encryption_function: Callable|None=None):
+def make_bundle(root_dir: str, output_file: str):
     files = gather_files(root_dir)
 
     blob_data = bytearray()
@@ -39,7 +39,7 @@ def make_bundle(root_dir: str, output_file: str, encryption_function: Callable|N
     bundle.extend(blob_data)
 
     # index
-    bundle.extend(BUNDLE_MAGIC_BYTES)
+    bundle.extend(conf.BUNDLE_MAGIC_BYTES)
     bundle.extend(struct.pack("<I", len(index_entries)))
 
     for path, off, size in index_entries:
@@ -49,16 +49,12 @@ def make_bundle(root_dir: str, output_file: str, encryption_function: Callable|N
         bundle.extend(struct.pack("<II", off, size))  # offset + size
 
     with open(output_file, "wb") as f:
-        if encryption_function:
+        if conf.encryption_function:
             try:
-                bundle = encryption_function(bundle)
+                bundle = conf.encryption_function(bundle)
             except Exception as e:
                 print(f"[make_bundle] error while encrypting bundle:\n{e}")
                 return
         f.write(bundle)
 
     print(f"Bundle created: {output_file} ({len(bundle)} bytes, {len(files)} files)")
-
-# Example usage
-if __name__ == "__main__":
-    make_bundle("assets", "assets.bin")
