@@ -1,4 +1,4 @@
-imporsts sys
+import sys
 import os
 import builtins
 import importlib.abc

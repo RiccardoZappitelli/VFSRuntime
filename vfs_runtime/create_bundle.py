@@ -1,6 +1,8 @@
 import os
 import struct
+from typing import Callable
 import zlib
+from collections.abc import Callable
 
 from . import conf
 
@@ -19,7 +21,7 @@ def gather_files(root_dir: str):
             files.append((rel_path, full_path))
     return files
 
-def make_bundle(root_dir: str, output_file: str):
+def make_bundle(root_dir: str, output_file: str, encryption_function: Callable|None = None):
     files = gather_files(root_dir)
 
     blob_data = bytearray()
@@ -49,9 +51,10 @@ def make_bundle(root_dir: str, output_file: str):
         bundle.extend(struct.pack("<II", off, size))  # offset + size
 
     with open(output_file, "wb") as f:
-        if conf.encryption_function:
+        if conf.encryption_function or encryption_function:
             try:
-                bundle = conf.encryption_function(bundle)
+                f = conf.encryption_function or encryption_function
+                bundle = f(bundle)
             except Exception as e:
                 print(f"[make_bundle] error while encrypting bundle:\n{e}")
                 return
