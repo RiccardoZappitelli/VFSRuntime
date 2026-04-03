@@ -45,7 +45,7 @@ Default:
 ### 2. Import VFS (that's it)
 
 ``` python
-import vfs_runtime
+from vfs_runtime import *
 ```
 
 ------------------------------------------------------------------------
@@ -107,9 +107,7 @@ img = imread("vfx/image.png")
 ## Base Example
 
 ``` python
-import vfs_runtime
-
-from os import listdir
+from vfs_runtime import *
 
 print(listdir("vfx"))
 
