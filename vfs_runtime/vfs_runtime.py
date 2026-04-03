@@ -9,6 +9,7 @@ import zlib
 import tempfile
 import atexit
 from collections.abc import Callable
+from .conf import *
 
 try:
     import cv2
@@ -16,12 +17,6 @@ try:
 except ImportError:
     cv2_installed = False
 
-# =========================
-# CONFIG
-# =========================
-BUNDLE_PATH = None
-BUNDLE_NAME = "assets.bin"
-BUNDLE_MAGIC_BYTES = b"RCPTB"
 
 FROZEN = getattr(sys, "frozen", False)
 

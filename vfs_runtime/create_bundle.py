@@ -3,7 +3,7 @@ import struct
 import zlib
 from collections.abc import Callable
 
-MAGIC = b"RCPTB"
+from.conf import *
 
 def compress_file(path: str) -> bytes:
     with open(path, "rb") as f:
@@ -39,7 +39,7 @@ def make_bundle(root_dir: str, output_file: str, encryption_function: Callable|N
     bundle.extend(blob_data)
 
     # index
-    bundle.extend(MAGIC)
+    bundle.extend(BUNDLE_MAGIC_BYTES)
     bundle.extend(struct.pack("<I", len(index_entries)))
 
     for path, off, size in index_entries:
