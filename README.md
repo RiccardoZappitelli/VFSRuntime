@@ -23,6 +23,7 @@ Designed for **Nuitka onefile** but works in dev and standalone too.
     vfs_runtime/
     ├── __init__.py
     ├── vfs_runtime.py
+    ├── conf.py
     └── create_bundle.py
 
 ------------------------------------------------------------------------
@@ -90,14 +91,6 @@ img = imread("vfx/image.png")
 
 ------------------------------------------------------------------------
 
-## Import from Bundle
-
-``` python
-import mymodule
-```
-
-------------------------------------------------------------------------
-
 ## Debug
 
     [VFS](read, path=vfx/smoke.png) read 1234 bytes
@@ -111,7 +104,7 @@ import mymodule
 
 ------------------------------------------------------------------------
 
-## Example
+## Base Example
 
 ``` python
 import vfs_runtime
@@ -122,6 +115,27 @@ print(listdir("vfx"))
 
 with open("vfx/smoke.png", "rb") as f:
     data = f.read()
+```
+
+## CONFIGURATION & ENCRYPTION
+```python
+import vfs_runtime.conf as conf
+from vfs_runtime.create_bundle import make_bundle
+from vfs_runtime import *
+
+def xor_encrypt(data: str, key: int) -> str:
+    return bytes(b ^ key for b in data)
+
+def xor_decrypt(encrypted_text: str, key: int) -> str:
+    return xor_encrypt(encrypted_text, key)
+
+conf.encryption_function = lambda x:xor_encrypt(x, 46) #46 is the key
+conf.decryption_function = lambda x:xor_decrypt(x, 46)
+"""Bundle creation
+make_bundle("test_directory", "assets.bin")
+"""
+
+init_vfs()
 ```
 
 ------------------------------------------------------------------------
